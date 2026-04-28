@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SQS vs SNS: When to Use Each — Joao Duarte</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;1,9..144,300;1,9..144,700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --white: #ffffff;
+      --off: #f7f6f3;
+      --ink: #111110;
+      --mid: #6b6b67;
+      --light: #d4d3cf;
+      --accent: #c8502a;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', sans-serif; background: var(--white); color: var(--ink); overflow-x: hidden; }
+
+    nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; padding: 1.4rem 5vw; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); border-bottom: 1px solid var(--light); }
+    .nav-logo { font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.1rem; color: var(--ink); text-decoration: none; }
+    .nav-links { display: flex; gap: 2.5rem; list-style: none; }
+    .nav-links a { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mid); text-decoration: none; transition: color 0.2s; }
+    .nav-links a:hover, .nav-links a.active { color: var(--ink); }
+
+    /* POST HEADER */
+    .post-header { padding: 9rem 8vw 4rem; border-bottom: 1px solid var(--light); display: grid; grid-template-columns: 1fr 320px; gap: 6rem; align-items: end; }
+    .post-header-left { animation: fadeIn 0.7s 0.2s ease both; }
+    .post-breadcrumb { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 2rem; }
+    .post-breadcrumb a { font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--mid); text-decoration: none; transition: color 0.2s; }
+    .post-breadcrumb a:hover { color: var(--ink); }
+    .post-breadcrumb span { font-size: 0.65rem; color: var(--light); }
+    .post-tag { display: inline-block; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 0.25rem 0.6rem; border: 1px solid var(--accent); color: var(--accent); margin-bottom: 1.5rem; }
+    .post-title { font-family: 'Fraunces', serif; font-size: clamp(2rem, 4vw, 3.2rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.08; margin-bottom: 1.5rem; }
+    .post-title em { font-style: italic; font-weight: 300; color: var(--mid); }
+    .post-subtitle { font-size: 1rem; line-height: 1.8; color: var(--mid); font-weight: 300; max-width: 560px; }
+
+    .post-header-right { animation: fadeIn 0.7s 0.4s ease both; }
+    .post-meta-block { display: flex; flex-direction: column; gap: 1.2rem; padding: 2.5rem; background: var(--off); border: 1px solid var(--light); }
+    .meta-row { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 1rem; border-bottom: 1px solid var(--light); }
+    .meta-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .meta-label { font-size: 0.6rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--mid); }
+    .meta-value { font-family: 'Fraunces', serif; font-size: 0.9rem; color: var(--ink); }
+    .tech-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+    .tech-tag { font-size: 0.62rem; letter-spacing: 0.08em; padding: 0.2rem 0.55rem; background: var(--white); color: var(--mid); border: 1px solid var(--light); }
+
+    /* POST BODY */
+    .post-body { display: grid; grid-template-columns: 1fr 680px 1fr; padding: 6rem 0; }
+    .post-content { grid-column: 2; }
+
+    .post-content h2 { font-family: 'Fraunces', serif; font-size: 1.6rem; font-weight: 700; letter-spacing: -0.025em; line-height: 1.2; margin: 3.5rem 0 1.2rem; color: var(--ink); }
+    .post-content h2:first-child { margin-top: 0; }
+    .post-content h3 { font-family: 'Fraunces', serif; font-size: 1.1rem; font-weight: 400; font-style: italic; letter-spacing: -0.01em; margin: 2.5rem 0 0.8rem; color: var(--ink); }
+    .post-content p { font-size: 0.92rem; line-height: 2; color: var(--mid); font-weight: 300; margin-bottom: 1.4rem; }
+    .post-content p strong { font-weight: 500; color: var(--ink); }
+    .post-content a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s; }
+    .post-content a:hover { border-bottom-color: var(--accent); }
+
+    .post-content ul, .post-content ol { padding-left: 1.5rem; margin-bottom: 1.4rem; }
+    .post-content li { font-size: 0.92rem; line-height: 2; color: var(--mid); font-weight: 300; margin-bottom: 0.3rem; }
+    .post-content li strong { font-weight: 500; color: var(--ink); }
+
+    .post-content pre { background: var(--ink); border-radius: 0; padding: 2rem 2.5rem; margin: 2rem 0; overflow-x: auto; }
+    .post-content code { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.78rem; line-height: 1.7; color: #e8e6e1; }
+    .post-content p code, .post-content li code { background: var(--off); border: 1px solid var(--light); padding: 0.15rem 0.4rem; font-size: 0.78rem; color: var(--accent); font-family: 'JetBrains Mono', 'Fira Code', monospace; border-radius: 0; }
+
+    .callout { background: var(--off); border-left: 2px solid var(--accent); padding: 1.5rem 2rem; margin: 2.5rem 0; }
+    .callout p { margin-bottom: 0; }
+    .callout p:first-child { font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.6rem; }
+
+    .section-divider { width: 40px; height: 1px; background: var(--light); margin: 3rem 0; }
+
+    /* DIAGRAM */
+    .diagram-wrap { margin: 2.5rem 0; background: var(--off); border: 1px solid var(--light); padding: 2rem; overflow-x: auto; }
+    .diagram-caption { font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mid); margin-top: 1rem; text-align: center; }
+
+    /* COMPARISON TABLE */
+    .compare-table { width: 100%; border-collapse: collapse; margin: 2rem 0; font-size: 0.85rem; }
+    .compare-table th { font-size: 0.6rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--mid); font-weight: 500; padding: 0.75rem 1rem; border-bottom: 2px solid var(--light); text-align: left; }
+    .compare-table th:first-child { width: 30%; }
+    .compare-table td { padding: 0.9rem 1rem; border-bottom: 1px solid var(--light); color: var(--mid); font-weight: 300; line-height: 1.6; vertical-align: top; }
+    .compare-table td:first-child { font-weight: 500; color: var(--ink); font-size: 0.82rem; }
+    .compare-table td.sqs { color: #2563a8; }
+    .compare-table td.sns { color: var(--accent); }
+    .compare-table tr:last-child td { border-bottom: none; }
+
+    /* POST FOOTER */
+    .post-footer { border-top: 1px solid var(--light); padding: 4rem 8vw; display: flex; justify-content: space-between; align-items: center; }
+    .back-link { display: inline-flex; align-items: center; gap: 0.6rem; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mid); text-decoration: none; border: 1px solid var(--light); padding: 0.8rem 1.4rem; transition: all 0.2s; }
+    .back-link:hover { border-color: var(--ink); color: var(--ink); }
+    .back-link-arrow { font-size: 0.9rem; }
+    .post-footer-meta { font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--light); }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+
+    @media (max-width: 1100px) {
+      .post-body { grid-template-columns: 5vw 1fr 5vw; }
+    }
+    @media (max-width: 900px) {
+      .post-header { grid-template-columns: 1fr; gap: 3rem; }
+      .nav-links { display: none; }
+      .post-footer { flex-direction: column; gap: 1.5rem; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="../../index.html" class="nav-logo">Joao Duarte</a>
+    <ul class="nav-links">
+      <li><a href="../../index.html#about">About</a></li>
+      <li><a href="../../index.html#skills">Skills</a></li>
+      <li><a href="../../index.html#projects">Projects</a></li>
+      <li><a href="../index.html" class="active">Blog</a></li>
+      <li><a href="../../index.html#contact">Contact</a></li>
+    </ul>
+  </nav>
+
+  <div class="post-header">
+    <div class="post-header-left">
+      <div class="post-breadcrumb">
+        <a href="../index.html">Blog</a>
+        <span>/</span>
+        <a href="#">AWS</a>
+      </div>
+      <div class="post-tag">AWS</div>
+      <h1 class="post-title">SQS vs SNS:<br><em>When to Use Each</em></h1>
+      <p class="post-subtitle">A practical breakdown of Amazon SQS and SNS — how they differ, where they overlap, and the patterns that will guide you to the right choice every time.</p>
+    </div>
+    <div class="post-header-right">
+      <div class="post-meta-block">
+        <div class="meta-row">
+          <span class="meta-label">Published</span>
+          <span class="meta-value">April 2026</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Reading time</span>
+          <span class="meta-value">8 min</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Author</span>
+          <span class="meta-value">Joao Duarte</span>
+        </div>
+        <div>
+          <div class="meta-label" style="margin-bottom: 0.75rem;">Stack</div>
+          <div class="tech-tags">
+            <span class="tech-tag">AWS</span>
+            <span class="tech-tag">SQS</span>
+            <span class="tech-tag">SNS</span>
+            <span class="tech-tag">Messaging</span>
+            <span class="tech-tag">Architecture</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="post-body">
+    <article class="post-content">
+
+      <h2>The confusion is understandable</h2>
+      <p>
+        Both SQS and SNS are AWS messaging services. Both let services talk to each other asynchronously. Both are fully managed. If you&rsquo;re new to the AWS ecosystem, it&rsquo;s natural to wonder why two services that look so similar exist side by side.
+      </p>
+      <p>
+        The difference is fundamental: <strong>SQS is a queue, SNS is a pub/sub system.</strong> They solve different problems, and conflating them leads to designs that are either over-engineered or broken in subtle ways. This post breaks down the distinction and gives you a clear mental model for picking the right tool.
+      </p>
+
+      <div class="section-divider"></div>
+
+      <h2>Amazon SQS &mdash; the queue</h2>
+      <p>
+        <strong>Simple Queue Service (SQS)</strong> is a fully managed message queue. A producer puts messages into the queue; a consumer polls the queue and processes them one by one. Once a message is successfully processed, the consumer deletes it. If processing fails, the message becomes visible again after the visibility timeout expires, so another consumer can retry it.
+      </p>
+
+      <div class="diagram-wrap">
+        <svg viewBox="0 0 620 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:620px;display:block;margin:0 auto;">
+          <defs>
+            <marker id="arrowSQS" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#d4d3cf"/>
+            </marker>
+          </defs>
+          <!-- Producer -->
+          <rect x="10" y="55" width="120" height="50" rx="2" fill="#f7f6f3" stroke="#d4d3cf" stroke-width="1.5"/>
+          <text x="70" y="75" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#6b6b67" letter-spacing="0.08em">PRODUCER</text>
+          <text x="70" y="92" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#111110">Order Service</text>
+          <!-- Arrow 1 -->
+          <line x1="131" y1="80" x2="188" y2="80" stroke="#d4d3cf" stroke-width="1.5" marker-end="url(#arrowSQS)"/>
+          <text x="159" y="72" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#6b6b67">send</text>
+          <!-- Queue -->
+          <rect x="190" y="40" width="240" height="80" rx="2" fill="#f7f6f3" stroke="#d4d3cf" stroke-width="1.5"/>
+          <text x="310" y="60" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#6b6b67" letter-spacing="0.08em">SQS QUEUE</text>
+          <!-- Message slots -->
+          <rect x="208" y="68" width="36" height="32" rx="1" fill="#ffffff" stroke="#d4d3cf" stroke-width="1"/>
+          <text x="226" y="88" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#111110">msg</text>
+          <rect x="252" y="68" width="36" height="32" rx="1" fill="#ffffff" stroke="#d4d3cf" stroke-width="1"/>
+          <text x="270" y="88" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#111110">msg</text>
+          <rect x="296" y="68" width="36" height="32" rx="1" fill="#ffffff" stroke="#d4d3cf" stroke-width="1"/>
+          <text x="314" y="88" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#111110">msg</text>
+          <rect x="340" y="68" width="36" height="32" rx="1" fill="#ffffff" stroke="#d4d3cf" stroke-width="1"/>
+          <text x="358" y="88" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#111110">msg</text>
+          <!-- Arrow 2 -->
+          <line x1="431" y1="80" x2="488" y2="80" stroke="#d4d3cf" stroke-width="1.5" marker-end="url(#arrowSQS)"/>
+          <text x="459" y="72" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#6b6b67">poll</text>
+          <!-- Consumer -->
+          <rect x="490" y="55" width="120" height="50" rx="2" fill="#f7f6f3" stroke="#d4d3cf" stroke-width="1.5"/>
+          <text x="550" y="75" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#6b6b67" letter-spacing="0.08em">CONSUMER</text>
+          <text x="550" y="92" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#111110">Payment Service</text>
+          <!-- Labels -->
+          <text x="310" y="148" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#6b6b67">Point-to-point: one consumer processes each message</text>
+        </svg>
+        <p class="diagram-caption">SQS — pull-based, point-to-point queue</p>
+      </div>
+
+      <h3>Key characteristics</h3>
+      <ul>
+        <li><strong>Pull-based</strong> &mdash; consumers actively poll the queue for messages. SQS supports long polling (up to 20 seconds) to reduce empty responses and cost.</li>
+        <li><strong>At-least-once delivery</strong> &mdash; messages are guaranteed to be delivered at least once. Duplicate delivery is possible in rare cases; design consumers to be idempotent.</li>
+        <li><strong>Visibility timeout</strong> &mdash; when a consumer picks up a message, it becomes invisible to other consumers for a configurable period. If processing fails, it reappears.</li>
+        <li><strong>Dead-letter queues (DLQ)</strong> &mdash; messages that fail repeatedly move to a DLQ for investigation and manual replay.</li>
+        <li><strong>Retention</strong> &mdash; messages persist in the queue for up to 14 days, even if no consumer is running.</li>
+        <li><strong>FIFO queues</strong> &mdash; for workloads that require strict ordering and exactly-once processing, SQS offers a FIFO variant.</li>
+      </ul>
+
+      <div class="callout">
+        <p>One queue, one logical consumer</p>
+        <p>You can run multiple worker instances polling the same queue for horizontal scaling, but each message is processed by exactly one of them. SQS is fundamentally a work distribution mechanism, not a broadcast mechanism.</p>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <h2>Amazon SNS &mdash; the pub/sub system</h2>
+      <p>
+        <strong>Simple Notification Service (SNS)</strong> is a fully managed pub/sub service. A publisher sends a message to a <em>topic</em>. SNS immediately fans that message out to all subscribers &mdash; simultaneously, in parallel. Subscribers can be SQS queues, Lambda functions, HTTP/HTTPS endpoints, email addresses, or SMS.
+      </p>
+
+      <div class="diagram-wrap">
+        <svg viewBox="0 0 620 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:620px;display:block;margin:0 auto;">
+          <defs>
+            <marker id="arrowSNS" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#c8502a"/>
+            </marker>
+          </defs>
+          <!-- Publisher -->
+          <rect x="20" y="105" width="120" height="50" rx="2" fill="#f7f6f3" stroke="#d4d3cf" stroke-width="1.5"/>
+          <text x="80" y="125" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#6b6b67" letter-spacing="0.08em">PUBLISHER</text>
+          <text x="80" y="142" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#111110">Order Service</text>
+          <!-- Arrow to SNS -->
+          <line x1="141" y1="130" x2="198" y2="130" stroke="#c8502a" stroke-width="1.5" marker-end="url(#arrowSNS)"/>
+          <text x="169" y="122" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#c8502a">publish</text>
+          <!-- SNS Topic -->
+          <rect x="200" y="90" width="130" height="80" rx="2" fill="#fff4f1" stroke="#c8502a" stroke-width="1.5"/>
+          <text x="265" y="118" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#c8502a" letter-spacing="0.08em">SNS TOPIC</text>
+          <text x="265" y="136" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#111110">order-events</text>
+          <text x="265" y="153" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#6b6b67">push-based</text>
+          <!-- Fan-out arrows -->
+          <line x1="331" y1="110" x2="418" y2="50" stroke="#c8502a" stroke-width="1.2" marker-end="url(#arrowSNS)"/>
+          <line x1="331" y1="120" x2="418" y2="105" stroke="#c8502a" stroke-width="1.2" marker-end="url(#arrowSNS)"/>
+          <line x1="331" y1="138" x2="418" y2="165" stroke="#c8502a" stroke-width="1.2" marker-end="url(#arrowSNS)"/>
+          <line x1="331" y1="150" x2="418" y2="215" stroke="#c8502a" stroke-width="1.2" marker-end="url(#arrowSNS)"/>
+          <!-- Subscribers -->
+          <rect x="420" y="20" width="170" height="42" rx="2" fill="#f7f6f3" stroke="#d4d3cf" stroke-width="1.5"/>
+          <text x="505" y="37" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#6b6b67" letter-spacing="0.08em">LAMBDA</text>
+          <text x="505" y="52" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#111110">Send confirmation email</text>
+
+          <rect x="420" y="80" width="170" height="42" rx="2" fill="#f7f6f3" stroke="#d4d3cf" stroke-width="1.5"/>
+          <text x="505" y="97" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#6b6b67" letter-spacing="0.08em">SQS QUEUE</text>
+          <text x="505" y="112" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#111110">Payment processing</text>
+
+          <rect x="420" y="143" width="170" height="42" rx="2" fill="#f7f6f3" stroke="#d4d3cf" stroke-width="1.5"/>
+          <text x="505" y="160" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#6b6b67" letter-spacing="0.08em">SQS QUEUE</text>
+          <text x="505" y="175" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#111110">Inventory update</text>
+
+          <rect x="420" y="197" width="170" height="42" rx="2" fill="#f7f6f3" stroke="#d4d3cf" stroke-width="1.5"/>
+          <text x="505" y="214" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#6b6b67" letter-spacing="0.08em">HTTP ENDPOINT</text>
+          <text x="505" y="229" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#111110">Analytics webhook</text>
+
+          <text x="310" y="252" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#6b6b67">Fan-out: all subscribers receive every message simultaneously</text>
+        </svg>
+        <p class="diagram-caption">SNS — push-based, fan-out to multiple subscribers</p>
+      </div>
+
+      <h3>Key characteristics</h3>
+      <ul>
+        <li><strong>Push-based</strong> &mdash; SNS pushes messages to subscribers immediately. There is no polling; delivery is near real-time.</li>
+        <li><strong>Fan-out</strong> &mdash; every subscriber receives every message. If you have five subscribers, the message is delivered five times in parallel.</li>
+        <li><strong>No persistence</strong> &mdash; SNS does not store messages. If a delivery attempt fails and the subscriber is unavailable, the message can be retried (with a configurable retry policy), but there is no durable queue behind the topic itself.</li>
+        <li><strong>Message filtering</strong> &mdash; each subscription can attach a filter policy so that only matching messages are delivered. This avoids routing logic in consumers.</li>
+        <li><strong>Multiple protocol support</strong> &mdash; HTTP/HTTPS, SQS, Lambda, email, SMS, and mobile push notifications are all valid subscriber types.</li>
+      </ul>
+
+      <div class="section-divider"></div>
+
+      <h2>Side-by-side comparison</h2>
+
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Property</th>
+            <th>SQS</th>
+            <th>SNS</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Delivery model</td>
+            <td class="sqs">Pull (consumers poll)</td>
+            <td class="sns">Push (SNS delivers)</td>
+          </tr>
+          <tr>
+            <td>Consumers per message</td>
+            <td class="sqs">One</td>
+            <td class="sns">All subscribers (fan-out)</td>
+          </tr>
+          <tr>
+            <td>Message persistence</td>
+            <td class="sqs">Up to 14 days</td>
+            <td class="sns">Not persisted; delivery only</td>
+          </tr>
+          <tr>
+            <td>Delivery guarantee</td>
+            <td class="sqs">At-least-once</td>
+            <td class="sns">At-least-once per subscriber</td>
+          </tr>
+          <tr>
+            <td>Ordering</td>
+            <td class="sqs">Standard or FIFO</td>
+            <td class="sns">No ordering guarantee</td>
+          </tr>
+          <tr>
+            <td>Rate limiting / buffering</td>
+            <td class="sqs">Yes — queue absorbs spikes</td>
+            <td class="sns">No — immediate fan-out</td>
+          </tr>
+          <tr>
+            <td>Message filtering</td>
+            <td class="sqs">Not built-in</td>
+            <td class="sns">Per-subscription filter policies</td>
+          </tr>
+          <tr>
+            <td>Dead-letter queues</td>
+            <td class="sqs">Native DLQ support</td>
+            <td class="sns">Supported for SQS/Lambda subscribers</td>
+          </tr>
+          <tr>
+            <td>Primary use case</td>
+            <td class="sqs">Work queue, task offloading</td>
+            <td class="sns">Event broadcast, notifications</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="section-divider"></div>
+
+      <h2>When to use SQS</h2>
+      <p>
+        Use SQS whenever you need to <strong>decouple a producer from a consumer and control the rate of processing</strong>. The queue acts as a buffer &mdash; it absorbs bursts of incoming work and lets your consumer scale independently.
+      </p>
+
+      <h3>Classic scenarios</h3>
+      <ul>
+        <li><strong>Task offloading</strong> &mdash; a web API receives a request, writes a job to SQS, and returns immediately. A background worker processes the job at its own pace. The user gets a fast response; the heavy work happens asynchronously.</li>
+        <li><strong>Rate limiting downstream services</strong> &mdash; if an external API you call has a rate limit of 10 requests per second, SQS lets you absorb spikes and drain the queue at a controlled rate. Without a queue, burst traffic would hit the API directly and fail.</li>
+        <li><strong>Retry and durability</strong> &mdash; messages survive consumer restarts, crashes, and deployments. Nothing is lost. Combined with a DLQ, you get visibility into failed messages without custom error stores.</li>
+        <li><strong>Ordered processing</strong> &mdash; financial transactions, audit logs, and state machines where message order matters should use a FIFO queue.</li>
+        <li><strong>Competing consumers pattern</strong> &mdash; scale horizontally by adding more consumer instances. SQS distributes messages across them automatically; no coordination needed.</li>
+      </ul>
+
+      <pre><code># Sending a message to SQS (Python, boto3)
+import boto3
+
+sqs = boto3.client('sqs', region_name='us-east-1')
+
+response = sqs.send_message(
+    QueueUrl='https://sqs.us-east-1.amazonaws.com/123456789/order-processing',
+    MessageBody='{"orderId": "abc-123", "total": 59.99}',
+    MessageAttributes={
+        'EventType': {
+            'DataType': 'String',
+            'StringValue': 'OrderPlaced'
+        }
+    }
+)</code></pre>
+
+      <div class="section-divider"></div>
+
+      <h2>When to use SNS</h2>
+      <p>
+        Use SNS whenever a single event needs to <strong>notify multiple independent systems simultaneously</strong>. The publisher does not know or care who the subscribers are. Adding a new subscriber does not require changing the publisher at all.
+      </p>
+
+      <h3>Classic scenarios</h3>
+      <ul>
+        <li><strong>Event broadcasting</strong> &mdash; an order is placed, and three systems need to know immediately: payments, inventory, and analytics. SNS delivers to all three in parallel without the publisher coupling to any of them.</li>
+        <li><strong>Real-time notifications</strong> &mdash; mobile push notifications, SMS alerts, or email notifications where low latency matters and persistence is not required.</li>
+        <li><strong>Decoupling microservices at the event layer</strong> &mdash; services publish domain events to topics. Other services subscribe to the topics they care about. Adding a new service means adding a new subscription, not modifying existing code.</li>
+        <li><strong>Triggering multiple Lambda functions</strong> &mdash; SNS is the cleanest way to invoke several Lambdas in response to a single event without chaining them together.</li>
+      </ul>
+
+      <pre><code># Publishing to SNS (Python, boto3)
+import boto3, json
+
+sns = boto3.client('sns', region_name='us-east-1')
+
+response = sns.publish(
+    TopicArn='arn:aws:sns:us-east-1:123456789:order-events',
+    Message=json.dumps({
+        'orderId': 'abc-123',
+        'customerId': 'usr-456',
+        'total': 59.99
+    }),
+    Subject='OrderPlaced',
+    MessageAttributes={
+        'EventType': {
+            'DataType': 'String',
+            'StringValue': 'OrderPlaced'
+        }
+    }
+)</code></pre>
+
+      <div class="section-divider"></div>
+
+      <h2>The SNS + SQS fan-out pattern</h2>
+      <p>
+        In practice, the most powerful setup combines both services. SNS broadcasts the event; each subscriber gets its own SQS queue. This gives you the fan-out of SNS <em>and</em> the durability, retry logic, and rate control of SQS &mdash; for every consumer independently.
+      </p>
+
+      <div class="diagram-wrap">
+        <svg viewBox="0 0 640 310" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:640px;display:block;margin:0 auto;">
+          <defs>
+            <marker id="arrowFO" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#c8502a"/>
+            </marker>
+            <marker id="arrowFOgray" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#d4d3cf"/>
+            </marker>
+          </defs>
+          <!-- Publisher -->
+          <rect x="10" y="125" width="110" height="50" rx="2" fill="#f7f6f3" stroke="#d4d3cf" stroke-width="1.5"/>
+          <text x="65" y="145" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#6b6b67" letter-spacing="0.08em">PUBLISHER</text>
+          <text x="65" y="162" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#111110">Order Service</text>
+
+          <line x1="121" y1="150" x2="168" y2="150" stroke="#c8502a" stroke-width="1.5" marker-end="url(#arrowFO)"/>
+
+          <!-- SNS Topic -->
+          <rect x="170" y="110" width="110" height="80" rx="2" fill="#fff4f1" stroke="#c8502a" stroke-width="1.5"/>
+          <text x="225" y="135" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#c8502a" letter-spacing="0.08em">SNS TOPIC</text>
+          <text x="225" y="152" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#111110">order-events</text>
+          <text x="225" y="170" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#6b6b67">fan-out</text>
+
+          <!-- Fan-out to SQS queues -->
+          <line x1="281" y1="130" x2="338" y2="70" stroke="#c8502a" stroke-width="1.2" marker-end="url(#arrowFO)"/>
+          <line x1="281" y1="155" x2="338" y2="155" stroke="#c8502a" stroke-width="1.2" marker-end="url(#arrowFO)"/>
+          <line x1="281" y1="170" x2="338" y2="235" stroke="#c8502a" stroke-width="1.2" marker-end="url(#arrowFO)"/>
+
+          <!-- Queue 1 -->
+          <rect x="340" y="42" width="110" height="46" rx="2" fill="#f7f6f3" stroke="#d4d3cf" stroke-width="1.5"/>
+          <text x="395" y="60" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#6b6b67" letter-spacing="0.08em">SQS QUEUE</text>
+          <text x="395" y="76" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#111110">payment-queue</text>
+          <line x1="451" y1="65" x2="498" y2="65" stroke="#d4d3cf" stroke-width="1.2" marker-end="url(#arrowFOgray)"/>
+          <rect x="500" y="42" width="110" height="46" rx="2" fill="#f7f6f3" stroke="#d4d3cf" stroke-width="1.5"/>
+          <text x="555" y="60" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#6b6b67" letter-spacing="0.08em">CONSUMER</text>
+          <text x="555" y="76" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#111110">Payment Service</text>
+
+          <!-- Queue 2 -->
+          <rect x="340" y="128" width="110" height="46" rx="2" fill="#f7f6f3" stroke="#d4d3cf" stroke-width="1.5"/>
+          <text x="395" y="146" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#6b6b67" letter-spacing="0.08em">SQS QUEUE</text>
+          <text x="395" y="162" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#111110">inventory-queue</text>
+          <line x1="451" y1="151" x2="498" y2="151" stroke="#d4d3cf" stroke-width="1.2" marker-end="url(#arrowFOgray)"/>
+          <rect x="500" y="128" width="110" height="46" rx="2" fill="#f7f6f3" stroke="#d4d3cf" stroke-width="1.5"/>
+          <text x="555" y="146" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#6b6b67" letter-spacing="0.08em">CONSUMER</text>
+          <text x="555" y="162" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#111110">Inventory Service</text>
+
+          <!-- Queue 3 -->
+          <rect x="340" y="210" width="110" height="46" rx="2" fill="#f7f6f3" stroke="#d4d3cf" stroke-width="1.5"/>
+          <text x="395" y="228" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#6b6b67" letter-spacing="0.08em">SQS QUEUE</text>
+          <text x="395" y="244" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#111110">analytics-queue</text>
+          <line x1="451" y1="233" x2="498" y2="233" stroke="#d4d3cf" stroke-width="1.2" marker-end="url(#arrowFOgray)"/>
+          <rect x="500" y="210" width="110" height="46" rx="2" fill="#f7f6f3" stroke="#d4d3cf" stroke-width="1.5"/>
+          <text x="555" y="228" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#6b6b67" letter-spacing="0.08em">CONSUMER</text>
+          <text x="555" y="244" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" fill="#111110">Analytics Service</text>
+
+          <text x="320" y="298" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#6b6b67">Each consumer has its own queue — independent durability and retry</text>
+        </svg>
+        <p class="diagram-caption">SNS + SQS fan-out pattern — the best of both worlds</p>
+      </div>
+
+      <p>
+        This pattern solves a real problem: if you only use SNS, a slow or temporarily unavailable subscriber will miss messages. If you only use SQS, you need multiple queues and separate producers for each consumer. The combined pattern lets a single publish flow reach multiple isolated, durable queues.
+      </p>
+
+      <div class="callout">
+        <p>Why this pattern is used everywhere</p>
+        <p>With SNS&nbsp;+&nbsp;SQS fan-out, each consumer team owns their queue. They can set their own visibility timeout, retry policy, and DLQ. One consumer going down does not affect others. Scaling a single consumer is independent of the rest of the pipeline.</p>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <h2>The decision framework</h2>
+      <p>
+        When you&rsquo;re standing at the whiteboard trying to decide, run through these questions:
+      </p>
+      <ol>
+        <li><strong>Does exactly one system need to process each event?</strong> Use SQS.</li>
+        <li><strong>Do multiple independent systems need to react to the same event?</strong> Use SNS &mdash; or SNS&nbsp;+&nbsp;SQS if those consumers need durability.</li>
+        <li><strong>Does the consumer need to process messages at its own pace?</strong> Use SQS. The queue buffers the load.</li>
+        <li><strong>Is low-latency delivery to multiple endpoints more important than guaranteed processing?</strong> Use SNS directly.</li>
+        <li><strong>Do you need message ordering?</strong> Use SQS FIFO. SNS does not guarantee order.</li>
+        <li><strong>Can you tolerate message loss if a subscriber is down?</strong> If yes, SNS alone may suffice. If no, add SQS per subscriber.</li>
+      </ol>
+
+      <div class="section-divider"></div>
+
+      <h2>Gotchas to watch out for</h2>
+      <p>
+        A few non-obvious behaviors that have caught people out in production:
+      </p>
+      <ul>
+        <li><strong>SQS does not guarantee FIFO by default.</strong> Standard queues offer best-effort ordering. If you process messages out of order, you need SQS FIFO and to accept the throughput trade-off (300 msg/s without batching vs. standard&rsquo;s effectively unlimited).</li>
+        <li><strong>SNS retry policy is not a substitute for a DLQ.</strong> SNS will retry failed HTTP deliveries with exponential backoff, but the retry window is limited. For any subscriber that might be down for minutes or hours, use an SQS queue instead of HTTP.</li>
+        <li><strong>The visibility timeout must exceed your processing time.</strong> If your Lambda or worker takes longer than the visibility timeout to process a message, SQS will assume it failed and redeliver it to another consumer &mdash; resulting in duplicate processing.</li>
+        <li><strong>SNS message size is capped at 256&nbsp;KB.</strong> For large payloads, the pattern is to store the payload in S3 and publish only the S3 object reference through SNS.</li>
+        <li><strong>Cross-account SNS&nbsp;&rarr;&nbsp;SQS subscriptions require explicit queue policies.</strong> The SQS queue must grant <code>sqs:SendMessage</code> to the SNS topic&rsquo;s ARN. Missing this is a common source of silent delivery failures.</li>
+      </ul>
+
+      <div class="section-divider"></div>
+
+      <h2>Closing thoughts</h2>
+      <p>
+        SQS and SNS are complementary, not competing. SQS is a work queue: it buffers, persists, and distributes tasks to a single logical consumer. SNS is a broadcast bus: it fans events out to multiple subscribers simultaneously.
+      </p>
+      <p>
+        When in doubt, the SNS&nbsp;+&nbsp;SQS fan-out pattern is the safest default for event-driven architectures. It adds modest infrastructure complexity in exchange for durability, independent scaling, and clean decoupling &mdash; properties that pay off quickly as a system grows.
+      </p>
+      <p>
+        If you&rsquo;re building a new service on AWS and reasoning through messaging patterns, feel free to reach out &mdash; happy to think through the design.
+      </p>
+
+    </article>
+  </div>
+
+  <div class="post-footer">
+    <a href="../index.html" class="back-link">
+      <span class="back-link-arrow">&#8592;</span> Back to Blog
+    </a>
+    <span class="post-footer-meta">Joao Duarte &mdash; April 2026</span>
+  </div>
+
+</body>
+</html>
